@@ -1,12 +1,16 @@
 import React, { useState } from 'react';
-import { Search, BookOpen, Video, FileText, ExternalLink, Star, Clock, Filter } from 'lucide-react';
+import { Search, BookOpen, Video, FileText, ExternalLink, Star, Clock, Filter, Loader } from 'lucide-react';
+import { useRAG } from '../contexts/RAGContext';
 
 const ContentFinder = () => {
+    const { queryDocuments, sets, loading } = useRAG();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFilter, setSelectedFilter] = useState('all');
+    const [searchResults, setSearchResults] = useState(null);
+    const [searching, setSearching] = useState(false);
 
-    // Mock content data
-    const contentItems = [
+    // Mock content data (fallback when no RAG results)
+    const mockContentItems = [
         {
             id: 1,
             title: 'Introduction to Calculus - Khan Academy',
@@ -40,43 +44,43 @@ const ContentFinder = () => {
             url: 'https://ocw.mit.edu',
             description: 'Complete linear algebra course from MIT with lectures and problem sets.'
         },
-        {
-            id: 4,
-            title: 'Graph Theory Visualization',
-            type: 'interactive',
-            source: 'VisuAlgo',
-            duration: 'Interactive',
-            rating: 4.7,
-            topic: 'Graph Theory',
-            url: 'https://visualgo.net',
-            description: 'Interactive visualizations of graph algorithms and data structures.'
-        },
-        {
-            id: 5,
-            title: 'Organic Chemistry Study Notes PDF',
+    ];
+
+    const handleSearch = async (e) => {
+        e.preventDefault();
+        if (!searchQuery.trim()) return;
+
+        try {
+            setSearching(true);
+            const results = await queryDocuments(searchQuery, null, 10);
+            setSearchResults(results);
+        } catch (error) {
+            console.error('Search error:', error);
+            setSearchResults({ results: [], total_found: 0 });
+        } finally {
+            setSearching(false);
+        }
+    };
+
+    // Determine what content to display
+    const displayContent = searchResults
+        ? searchResults.results.map((result, idx) => ({
+            id: `rag-${idx}`,
+            title: result.citation,
             type: 'document',
-            source: 'Chemistry Portal',
-            duration: '45 pages',
-            rating: 4.3,
-            topic: 'Organic Chemistry',
+            source: result.source,
+            duration: 'From your documents',
+            rating: result.relevance_score * 5,
+            topic: result.set_name,
             url: '#',
-            description: 'Comprehensive study notes covering all major organic chemistry topics.'
-        },
-    ];
-
-    const filters = [
-        { id: 'all', label: 'All', icon: BookOpen },
-        { id: 'video', label: 'Videos', icon: Video },
-        { id: 'article', label: 'Articles', icon: FileText },
-        { id: 'course', label: 'Courses', icon: BookOpen },
-    ];
-
-    const filteredContent = contentItems.filter(item => {
-        const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.topic.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesFilter = selectedFilter === 'all' || item.type === selectedFilter;
-        return matchesSearch && matchesFilter;
-    });
+            description: result.content.substring(0, 200) + '...'
+        }))
+        : mockContentItems.filter(item => {
+            const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                item.topic.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesFilter = selectedFilter === 'all' || item.type === selectedFilter;
+            return matchesSearch && matchesFilter;
+        });
 
     const getTypeColor = (type) => {
         const colors = {
@@ -96,11 +100,15 @@ const ContentFinder = () => {
                 {/* Header */}
                 <div>
                     <h2 className="text-3xl font-bold text-white mb-2">Content Finder</h2>
-                    <p className="text-slate-400">Discover curated learning resources tailored to your study topics</p>
+                    <p className="text-slate-400">
+                        {searchResults
+                            ? 'Searching your uploaded documents with RAG'
+                            : 'Discover curated learning resources tailored to your study topics'}
+                    </p>
                 </div>
 
                 {/* Search Bar */}
-                <div className="relative">
+                <form onSubmit={handleSearch} className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                     <input
                         type="text"
@@ -109,36 +117,29 @@ const ContentFinder = () => {
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full pl-12 pr-4 py-4 bg-slate-900/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     />
-                </div>
+                    {searching && (
+                        <Loader className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-400 animate-spin" size={20} />
+                    )}
+                </form>
 
-                {/* Filters */}
-                <div className="flex gap-3 items-center">
-                    <Filter size={18} className="text-slate-400" />
-                    <div className="flex gap-2 flex-wrap">
-                        {filters.map(filter => (
-                            <button
-                                key={filter.id}
-                                onClick={() => setSelectedFilter(filter.id)}
-                                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${selectedFilter === filter.id
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
-                                    }`}
-                            >
-                                <filter.icon size={16} />
-                                <span className="text-sm font-medium">{filter.label}</span>
-                            </button>
-                        ))}
+                {/* RAG Status */}
+                {searchResults && (
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-sm text-blue-300">
+                            ✨ Showing results from your uploaded documents using RAG
+                        </p>
                     </div>
-                </div>
+                )}
 
                 {/* Results Count */}
                 <div className="text-sm text-slate-400">
-                    Found <span className="text-white font-semibold">{filteredContent.length}</span> resources
+                    Found <span className="text-white font-semibold">{displayContent.length}</span> resources
+                    {searchResults && <span className="ml-2 text-blue-400">(from RAG search)</span>}
                 </div>
 
                 {/* Content Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {filteredContent.map(item => (
+                    {displayContent.map(item => (
                         <div
                             key={item.id}
                             className="group bg-slate-900/50 border border-slate-800 hover:border-blue-500/50 rounded-xl p-5 transition-all hover:shadow-lg hover:shadow-blue-500/10"
@@ -179,7 +180,7 @@ const ContentFinder = () => {
                                 </div>
                                 <div className="flex items-center gap-1 text-yellow-400">
                                     <Star size={14} fill="currentColor" />
-                                    <span className="text-sm font-medium">{item.rating}</span>
+                                    <span className="text-sm font-medium">{item.rating.toFixed(1)}</span>
                                 </div>
                             </div>
 
@@ -192,11 +193,15 @@ const ContentFinder = () => {
                 </div>
 
                 {/* Empty State */}
-                {filteredContent.length === 0 && (
+                {displayContent.length === 0 && (
                     <div className="text-center py-16">
                         <Search size={48} className="mx-auto text-slate-600 mb-4" />
                         <h3 className="text-xl font-semibold text-slate-400 mb-2">No results found</h3>
-                        <p className="text-slate-500">Try adjusting your search or filters</p>
+                        <p className="text-slate-500">
+                            {searchResults
+                                ? 'Try uploading documents in the RAG Test tab first'
+                                : 'Try adjusting your search or filters'}
+                        </p>
                     </div>
                 )}
 

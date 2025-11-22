@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Brain, Search, BarChart3 } from 'lucide-react';
+import { Brain, Search, BarChart3, Zap } from 'lucide-react';
 import GraphView from './components/GraphView';
 import SetDetailView from './components/SetDetailView';
 import HeadlineSidebar from './components/HeadlineSidebar';
 import ProgressView from './components/ProgressView';
 import ContentFinder from './components/ContentFinder';
+import RAGTestUI from './components/RAGTestUI';
 
 function App() {
     const [activeTab, setActiveTab] = useState('map');
@@ -41,6 +42,12 @@ function App() {
                         active={activeTab === 'progress'}
                         onClick={() => setActiveTab('progress')}
                     />
+                    <NavIcon
+                        icon={<Zap size={24} />}
+                        label="RAG Test"
+                        active={activeTab === 'rag-test'}
+                        onClick={() => setActiveTab('rag-test')}
+                    />
                 </div>
 
                 <div className="w-20" /> {/* Spacer for balance */}
@@ -62,6 +69,7 @@ function App() {
                 )}
                 {activeTab === 'content' && <ContentFinder />}
                 {activeTab === 'progress' && <ProgressView />}
+                {activeTab === 'rag-test' && <RAGTestUI />}
             </main>
         </div>
     );
