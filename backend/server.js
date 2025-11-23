@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-const PORT = 5000;
+// REMOVED: const PORT = 5000; (This was causing the crash)
 
 // Middleware
 app.use(cors());
@@ -73,12 +73,12 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
+// ✅ This is the correct PORT definition for Render
 const PORT = process.env.PORT || 5000;
 const HOST = '0.0.0.0';
 
 app.listen(PORT, HOST, () => {
   console.log(`RAG Backend Server running on http://${HOST}:${PORT}`);
 });
-
 
 module.exports = app;
