@@ -6,15 +6,9 @@ const fs = require('fs');
 
 const app = express();
 
-// CORS Configuration - Allow frontend domains
+// ✅ ALLOW ALL TRAFFIC (Fixes Network Error)
 app.use(cors({
-    origin: [
-        'https://eduplan-ai-sable.vercel.app',
-        'https://eduplan-ai.vercel.app',
-        'http://localhost:5173',
-        'http://localhost:3000'
-    ],
-    credentials: true,
+    origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
