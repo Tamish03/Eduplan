@@ -1,5 +1,6 @@
 import axios from 'axios';
 
+// Production backend API URL
 const API_BASE_URL = 'https://eduplanai.onrender.com/api';
 
 const api = axios.create({
@@ -7,6 +8,7 @@ const api = axios.create({
     headers: {
         'Content-Type': 'application/json',
     },
+    timeout: 30000, // 30 second timeout
 });
 
 // Sets API
