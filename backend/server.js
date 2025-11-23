@@ -5,10 +5,20 @@ const path = require('path');
 const fs = require('fs');
 
 const app = express();
-// REMOVED: const PORT = 5000; (This was causing the crash)
 
-// Middleware
-app.use(cors());
+// CORS Configuration - Allow frontend domains
+app.use(cors({
+    origin: [
+        'https://eduplan-ai-sable.vercel.app',
+        'https://eduplan-ai.vercel.app',
+        'http://localhost:5173',
+        'http://localhost:3000'
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
