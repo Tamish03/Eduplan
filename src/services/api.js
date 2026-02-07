@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-// Production backend API URL
-const API_BASE_URL = 'https://eduplanai.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -61,6 +60,7 @@ export const searchAPI = {
 export const progressAPI = {
     getOverview: () => api.get('/progress/overview'),
     getGapAnalysis: (setId) => api.get(`/progress/gap-analysis/${setId}`),
+    getExamAnalysis: (limit = 30) => api.get(`/progress/exam-analysis?limit=${limit}`),
     logSession: (data) => api.post('/progress/session', data),
     logQuiz: (data) => api.post('/progress/quiz', data),
     logInteraction: (data) => api.post('/progress/interaction', data),
@@ -69,4 +69,27 @@ export const progressAPI = {
 // Health check
 export const healthCheck = () => api.get('/health');
 
+// Auth API
+export const authAPI = {
+    sendSignupOtp: (email) => api.post('/auth/send-signup-otp', { email }),
+    signup: (data) => api.post('/auth/signup', data),
+    login: (email, password) => api.post('/auth/login', { email, password }),
+    sendResetOtp: (email) => api.post('/auth/send-reset-otp', { email }),
+    resetPassword: (data) => api.post('/auth/reset-password', data),
+};
+
+// Advanced Intelligence API
+export const advancedAPI = {
+    getLearningTwin: (setId) => api.get(`/advanced/learning-twin/${setId}`),
+    recomputeLearningTwin: (setId) => api.post(`/advanced/learning-twin/${setId}/recompute`),
+    safeQuery: (query, setId = null) => api.post('/advanced/safe-query', { query, setId }),
+    getBreakpoint: (setId) => api.get(`/advanced/breakpoint/${setId}`),
+    generateExam: (setId, numQuestions = 8) =>
+        api.post(`/advanced/exam/generate/${setId}`, { numQuestions }),
+    getExamSession: (sessionId) => api.get(`/advanced/exam/session/${sessionId}`),
+    submitExam: (sessionId, answers) =>
+        api.post(`/advanced/exam/submit/${sessionId}`, { answers }),
+};
+
+export { API_BASE_URL };
 export default api;

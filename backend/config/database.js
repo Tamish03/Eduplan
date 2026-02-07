@@ -8,7 +8,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Error opening database:', err.message);
     } else {
-        console.log('✅ Connected to SQLite database');
+        db.run('PRAGMA foreign_keys = ON');
+        console.log('Connected to SQLite database');
         initializeDatabase();
     }
 });
@@ -144,8 +145,62 @@ function initializeDatabase() {
       )
     `);
 
-        console.log('✅ Database tables initialized');
+        // Users table - authentication
+        db.run(`
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        full_name TEXT NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        email_verified INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+        // OTP table for signup and password reset
+        db.run(`
+      CREATE TABLE IF NOT EXISTS email_otps (
+        id TEXT PRIMARY KEY,
+        email TEXT NOT NULL,
+        otp_hash TEXT NOT NULL,
+        purpose TEXT NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+        // Learning Twin profiles per set
+        db.run(`
+      CREATE TABLE IF NOT EXISTS learning_profiles (
+        id TEXT PRIMARY KEY,
+        set_id TEXT NOT NULL UNIQUE,
+        profile_json TEXT NOT NULL,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (set_id) REFERENCES sets(id) ON DELETE CASCADE
+      )
+    `);
+
+        // Exam mode sessions
+        db.run(`
+      CREATE TABLE IF NOT EXISTS exam_sessions (
+        id TEXT PRIMARY KEY,
+        set_id TEXT NOT NULL,
+        questions_json TEXT NOT NULL,
+        answer_key_json TEXT NOT NULL,
+        answers_json TEXT,
+        score REAL,
+        total_questions INTEGER NOT NULL,
+        generated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        submitted_at DATETIME,
+        FOREIGN KEY (set_id) REFERENCES sets(id) ON DELETE CASCADE
+      )
+    `);
+
+        console.log('Database tables initialized');
     });
 }
 
 module.exports = db;
+

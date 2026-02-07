@@ -1,110 +1,160 @@
-// Gemini Embeddings Integration
-// Replaces OpenAI with Google Gemini text-embedding-004
-
 const axios = require('axios');
-require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
+const path = require('path');
+const { getGeminiApiKey } = require('./env');
 
-const EMBEDDING_MODEL = 'models/text-embedding-004';
-const BATCH_SIZE = 100;
+require('dotenv').config({ path: path.join(__dirname, '../../.env') });
+
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 
-/**
- * Generate embeddings for a single text using Gemini
- * @param {string} text - Text to embed
- * @returns {Promise<number[]>} - Embedding vector (768 dimensions)
- */
+function parseModelList(raw, defaults) {
+    const source = raw || defaults;
+    return source
+        .split(',')
+        .map((m) => m.trim())
+        .filter(Boolean)
+        .map((m) => (m.startsWith('models/') ? m : `models/${m}`));
+}
+
+const CONFIGURED_EMBEDDING_MODELS = parseModelList(
+    process.env.GEMINI_EMBEDDING_MODELS,
+    'gemini-embedding-001,text-embedding-004,embedding-001'
+);
+
+let discoveredEmbeddingModels = null;
+
+async function discoverEmbeddingModels(apiKey) {
+    if (discoveredEmbeddingModels) return discoveredEmbeddingModels;
+
+    try {
+        const res = await axios.get('https://generativelanguage.googleapis.com/v1beta/models', {
+            headers: { 'x-goog-api-key': apiKey }
+        });
+
+        const models = (res.data?.models || [])
+            .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('embedContent'))
+            .map((m) => m.name)
+            .filter(Boolean);
+
+        discoveredEmbeddingModels = models;
+        return models;
+    } catch {
+        return [];
+    }
+}
+
+async function getCandidateEmbeddingModels(apiKey) {
+    const discovered = await discoverEmbeddingModels(apiKey);
+    if (!discovered.length) return CONFIGURED_EMBEDDING_MODELS;
+
+    const prioritized = CONFIGURED_EMBEDDING_MODELS.filter((m) => discovered.includes(m));
+    const extras = discovered.filter((m) => !prioritized.includes(m));
+    return [...prioritized, ...extras];
+}
+
+function shouldTryNextModel(err) {
+    const status = err?.response?.status;
+    const message = String(err?.response?.data?.error?.message || err?.message || '').toLowerCase();
+
+    if ([404, 429, 503].includes(status)) return true;
+    if (status === 400 && (message.includes('not found') || message.includes('not supported'))) return true;
+    return false;
+}
+
 async function generateEmbedding(text) {
     if (!text || text.trim().length === 0) {
         throw new Error('Text cannot be empty');
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/${EMBEDDING_MODEL}:embedContent?key=${apiKey}`;
+    const failures = [];
+    const models = await getCandidateEmbeddingModels(apiKey);
 
-    try {
-        const response = await axios.post(endpoint, {
-            content: { parts: [{ text }] }
-        });
+    for (const model of models) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/${model}:embedContent`;
+        try {
+            const response = await axios.post(
+                endpoint,
+                { content: { parts: [{ text }] } },
+                { headers: { 'x-goog-api-key': apiKey } }
+            );
 
-        return response.data.embedding.values;
-    } catch (error) {
-        console.error('Error generating embedding:', error.response?.data || error.message);
-        throw error;
+            return response.data.embedding.values;
+        } catch (error) {
+            failures.push({
+                model,
+                status: error?.response?.status,
+                message: error?.response?.data?.error?.message || error.message
+            });
+
+            if (!shouldTryNextModel(error)) {
+                break;
+            }
+        }
     }
+
+    const e = new Error('All embedding model attempts failed');
+    e.failures = failures;
+    console.error('Embedding model failures:', failures);
+    throw e;
 }
 
-/**
- * Generate embeddings for multiple texts in batches
- * @param {string[]} texts - Array of texts to embed
- * @returns {Promise<number[][]>} - Array of embedding vectors
- */
 async function generateEmbeddings(texts) {
     if (!Array.isArray(texts) || texts.length === 0) {
         throw new Error('Texts must be a non-empty array');
     }
 
-    // Gemini batch embedding endpoint is different or we can just loop single calls for now
-    // or use batchEmbedContents if available.
-    // batchEmbedContents is available: models/text-embedding-004:batchEmbedContents
-
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) throw new Error('GEMINI_API_KEY not set');
 
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/${EMBEDDING_MODEL}:batchEmbedContents?key=${apiKey}`;
+    const models = await getCandidateEmbeddingModels(apiKey);
 
-    const embeddings = [];
-
-    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
-        const batch = texts.slice(i, i + BATCH_SIZE);
-
+    for (const model of models) {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/${model}:batchEmbedContents`;
         try {
-            const requests = batch.map(text => ({
+            const requests = texts.map((text) => ({
                 content: { parts: [{ text }] },
-                model: EMBEDDING_MODEL
+                model
             }));
 
-            const response = await axios.post(endpoint, { requests });
+            const response = await axios.post(
+                endpoint,
+                { requests },
+                { headers: { 'x-goog-api-key': apiKey } }
+            );
 
-            // response.data.embeddings is an array of objects { values: [...] }
-            const batchEmbeddings = response.data.embeddings.map(e => e.values);
-            embeddings.push(...batchEmbeddings);
-
-            console.log(`Generated embeddings for ${embeddings.length}/${texts.length} texts`);
+            const batchEmbeddings = response.data.embeddings.map((e) => e.values);
+            return batchEmbeddings;
         } catch (error) {
-            console.error(`Error in batch ${i / BATCH_SIZE + 1}:`, error.response?.data || error.message);
-            throw error;
+            if (!shouldTryNextModel(error)) {
+                break;
+            }
         }
     }
 
+    const embeddings = [];
+    for (const text of texts) {
+        embeddings.push(await generateEmbedding(text));
+    }
     return embeddings;
 }
 
-/**
- * Generate embedding with retry logic
- */
 async function generateEmbeddingWithRetry(text, retries = MAX_RETRIES) {
     try {
         return await generateEmbedding(text);
     } catch (error) {
         if (retries > 0) {
-            console.log(`Retrying... (${MAX_RETRIES - retries + 1}/${MAX_RETRIES})`);
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY));
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
             return generateEmbeddingWithRetry(text, retries - 1);
         }
         throw error;
     }
 }
 
-/**
- * Calculate cosine similarity
- */
 function cosineSimilarity(vecA, vecB) {
     if (vecA.length !== vecB.length) {
-        // Handle dimension mismatch if switching models
-        console.warn(`Vector dimension mismatch: ${vecA.length} vs ${vecB.length}`);
         return 0;
     }
 
@@ -118,16 +168,16 @@ function cosineSimilarity(vecA, vecB) {
         normB += vecB[i] * vecB[i];
     }
 
-    return (normA === 0 || normB === 0) ? 0 : dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+    return normA === 0 || normB === 0 ? 0 : dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 function getEmbeddingDimensions() {
-    return 768; // text-embedding-004 is 768 dimensions
+    return 768;
 }
 
 function validateApiKey() {
-    if (!process.env.GEMINI_API_KEY) {
-        throw new Error('GEMINI_API_KEY not configured');
+    if (!getGeminiApiKey()) {
+        throw new Error('GEMINI_API_KEY (or GOOGLE_API_KEY) not configured');
     }
 }
 
@@ -138,5 +188,5 @@ module.exports = {
     cosineSimilarity,
     getEmbeddingDimensions,
     validateApiKey,
-    EMBEDDING_MODEL
+    CONFIGURED_EMBEDDING_MODELS
 };

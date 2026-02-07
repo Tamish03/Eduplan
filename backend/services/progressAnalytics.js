@@ -198,6 +198,101 @@ Keep your response concise and encouraging (max 150 words).`;
     }
 
     /**
+     * Aggregate exam score analytics from exam sessions and quiz results
+     */
+    async getExamScoreAnalysis(limit = 30) {
+        const examSessions = await new Promise((resolve, reject) => {
+            db.all(
+                `SELECT es.id, es.set_id, es.score, es.total_questions, es.submitted_at, s.name as topic
+                 FROM exam_sessions es
+                 JOIN sets s ON s.id = es.set_id
+                 WHERE es.submitted_at IS NOT NULL AND es.score IS NOT NULL
+                 ORDER BY es.submitted_at DESC
+                 LIMIT ?`,
+                [limit],
+                (err, rows) => (err ? reject(err) : resolve(rows))
+            );
+        });
+
+        const quizSessions = await new Promise((resolve, reject) => {
+            db.all(
+                `SELECT qr.id, qr.set_id, qr.score, qr.total_questions, qr.completed_at as submitted_at, s.name as topic
+                 FROM quiz_results qr
+                 JOIN sets s ON s.id = qr.set_id
+                 ORDER BY qr.completed_at DESC
+                 LIMIT ?`,
+                [limit],
+                (err, rows) => (err ? reject(err) : resolve(rows))
+            );
+        });
+
+        const normalizedExams = examSessions.map((r) => ({
+            id: r.id,
+            set_id: r.set_id,
+            topic: r.topic,
+            score: Number(r.score),
+            total_questions: Number(r.total_questions || 0),
+            submitted_at: r.submitted_at,
+            source: 'exam_mode',
+        }));
+
+        const normalizedQuizzes = quizSessions.map((r) => ({
+            id: r.id,
+            set_id: r.set_id,
+            topic: r.topic,
+            score: Number(r.score),
+            total_questions: Number(r.total_questions || 0),
+            submitted_at: r.submitted_at,
+            source: 'quiz',
+        }));
+
+        const combined = [...normalizedExams, ...normalizedQuizzes]
+            .sort((a, b) => new Date(a.submitted_at) - new Date(b.submitted_at));
+
+        const avgScore = combined.length
+            ? Number((combined.reduce((s, x) => s + x.score, 0) / combined.length).toFixed(2))
+            : 0;
+
+        const latestScore = combined.length ? combined[combined.length - 1].score : 0;
+        const trendDelta = combined.length > 1 ? Number((latestScore - combined[0].score).toFixed(2)) : 0;
+
+        const byTopicMap = {};
+        combined.forEach((item) => {
+            if (!byTopicMap[item.topic]) {
+                byTopicMap[item.topic] = { topic: item.topic, attempts: 0, avg_score: 0, _sum: 0 };
+            }
+            byTopicMap[item.topic].attempts += 1;
+            byTopicMap[item.topic]._sum += item.score;
+        });
+
+        const byTopic = Object.values(byTopicMap).map((x) => ({
+            topic: x.topic,
+            attempts: x.attempts,
+            avg_score: Number((x._sum / x.attempts).toFixed(2)),
+        }));
+
+        const timeline = combined.map((item, idx) => ({
+            index: idx + 1,
+            label: `${idx + 1}`,
+            topic: item.topic,
+            score: Number(item.score.toFixed(2)),
+            source: item.source,
+            submitted_at: item.submitted_at,
+        }));
+
+        return {
+            summary: {
+                total_attempts: combined.length,
+                average_score: avgScore,
+                latest_score: latestScore,
+                trend_delta: trendDelta,
+            },
+            timeline,
+            by_topic: byTopic,
+        };
+    }
+
+    /**
      * Log a study session
      */
     async logStudySession(setId, durationMinutes, activities = '', notes = '') {

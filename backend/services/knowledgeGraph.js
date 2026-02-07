@@ -83,6 +83,8 @@ class KnowledgeGraph {
     }
 
     calculateSimilarity(text1, text2) {
+        if (!text1 || !text2) return 0;
+
         // Tokenize both texts
         const tokens1 = new Set(this.tokenizer.tokenize(text1.toLowerCase()));
         const tokens2 = new Set(this.tokenizer.tokenize(text2.toLowerCase()));
@@ -91,7 +93,7 @@ class KnowledgeGraph {
         const intersection = new Set([...tokens1].filter(x => tokens2.has(x)));
         const union = new Set([...tokens1, ...tokens2]);
 
-        return intersection.size / union.size;
+        return union.size === 0 ? 0 : intersection.size / union.size;
     }
 
     async createConnection(sourceId, targetId, strength) {

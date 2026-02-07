@@ -70,7 +70,7 @@ const DocumentUpload = ({ setId, onUploadComplete }) => {
                     type="file"
                     id="file-upload"
                     className="hidden"
-                    accept=".pdf,.txt,.doc,.docx"
+                    accept=".pdf,.txt"
                     onChange={handleChange}
                     disabled={uploading}
                 />
@@ -94,7 +94,7 @@ const DocumentUpload = ({ setId, onUploadComplete }) => {
                                 <p className="mb-2 text-sm text-slate-300">
                                     <span className="font-semibold">Click to upload</span> or drag and drop
                                 </p>
-                                <p className="text-xs text-slate-500">PDF, TXT, DOC, or DOCX (MAX. 10MB)</p>
+                                <p className="text-xs text-slate-500">PDF or TXT (MAX. 10MB)</p>
                             </>
                         )}
                     </div>

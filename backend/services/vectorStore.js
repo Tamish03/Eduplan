@@ -1,14 +1,19 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { getGeminiApiKey } = require('../utils/env');
 
 // Initialize Google Gemini
 // Make sure you have GEMINI_API_KEY in your .env and Render Environment Variables
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const geminiApiKey = getGeminiApiKey();
+if (!geminiApiKey) {
+    throw new Error('GEMINI_API_KEY (or GOOGLE_API_KEY) is required for vectorStore');
+}
+const genAI = new GoogleGenerativeAI(geminiApiKey);
 const model = genAI.getGenerativeModel({ model: "embedding-001" });
 
 // Connect to SQLite
-const dbPath = path.join(__dirname, '../../database.sqlite');
+const dbPath = path.join(__dirname, '../database.sqlite');
 const db = new sqlite3.Database(dbPath);
 
 // 1. Initialize Table

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, Label, BarChart, Bar } from 'recharts';
+import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, Label, BarChart, Bar, LineChart, Line } from 'recharts';
 import { AlertTriangle, CheckCircle, Clock, TrendingUp, X, BookOpen, Target, Lightbulb, Loader } from 'lucide-react';
 import { progressAPI } from '../services/api';
 
@@ -8,6 +8,7 @@ const ProgressView = () => {
     const [realData, setRealData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [aiRecommendations, setAiRecommendations] = useState(null);
+    const [examAnalysis, setExamAnalysis] = useState(null);
 
     // Load real progress data on mount
     useEffect(() => {
@@ -18,6 +19,8 @@ const ProgressView = () => {
                     setRealData(response.data.data);
                     setAiRecommendations(response.data.recommendations);
                 }
+                const examResponse = await progressAPI.getExamAnalysis();
+                setExamAnalysis(examResponse.data);
             } catch (error) {
                 console.error('Error loading progress data:', error);
             } finally {
@@ -228,6 +231,45 @@ const ProgressView = () => {
                     </div>
                 </div>
 
+                {/* Exam Score Analyzer */}
+                <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
+                    <h3 className="text-xl font-semibold text-white mb-4">Exam Score Analyzer</h3>
+                    {examAnalysis && examAnalysis.summary && examAnalysis.summary.total_attempts > 0 ? (
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <MetricCard label="Total Attempts" value={examAnalysis.summary.total_attempts} />
+                                <MetricCard label="Average Score" value={`${examAnalysis.summary.average_score}%`} />
+                                <MetricCard label="Latest Score" value={`${examAnalysis.summary.latest_score}%`} />
+                                <MetricCard
+                                    label="Trend Delta"
+                                    value={`${examAnalysis.summary.trend_delta > 0 ? '+' : ''}${examAnalysis.summary.trend_delta}%`}
+                                    positive={examAnalysis.summary.trend_delta >= 0}
+                                />
+                            </div>
+
+                            <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={examAnalysis.timeline}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                        <XAxis dataKey="label" stroke="#94a3b8" />
+                                        <YAxis stroke="#94a3b8" domain={[0, 100]} />
+                                        <Tooltip
+                                            contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #475569' }}
+                                            formatter={(value, name, props) => [`${value}%`, props.payload.topic]}
+                                            labelFormatter={(label) => `Attempt ${label}`}
+                                        />
+                                        <Line type="monotone" dataKey="score" stroke="#22c55e" strokeWidth={2} dot={{ r: 3 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-slate-400 text-sm">
+                            No exam attempts recorded yet. Use Exam Mode in Brainstorm to generate and submit tests.
+                        </div>
+                    )}
+                </div>
+
             </div>
 
             {/* Gap Analysis Modal */}
@@ -358,5 +400,14 @@ const ProgressView = () => {
         </div>
     );
 };
+
+const MetricCard = ({ label, value, positive = true }) => (
+    <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+        <div className="text-xs text-slate-400 mb-1">{label}</div>
+        <div className={`text-lg font-semibold ${label === 'Trend Delta' ? (positive ? 'text-emerald-300' : 'text-red-300') : 'text-white'}`}>
+            {value}
+        </div>
+    </div>
+);
 
 export default ProgressView;

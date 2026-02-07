@@ -52,9 +52,10 @@ Only return the JSON array, nothing else.`;
         // Parse the JSON response
         let resources;
         try {
-            // Extract JSON from markdown code blocks if present
-            const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || response.match(/\[[\s\S]*\]/);
-            const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : response;
+            // Extract JSON from markdown code blocks if present (supports CRLF/LF)
+            const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+            const arrayMatch = response.match(/\[[\s\S]*\]/);
+            const jsonString = codeBlockMatch?.[1] || arrayMatch?.[0] || response;
             resources = JSON.parse(jsonString);
             console.log('Successfully parsed', resources.length, 'resources');
         } catch (parseError) {

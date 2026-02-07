@@ -1,9 +1,17 @@
-// Force rebuild after UI changes
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { AlertCircle, BookOpen, Brain, CheckCircle, FileText, GraduationCap, Loader, Radar, Save, Search, Shield, Trash2, X } from 'lucide-react';
 import { useRAG } from '../contexts/RAGContext';
+import { advancedAPI } from '../services/api';
 import DocumentUpload from './DocumentUpload';
-import { Search, BookOpen, Loader, CheckCircle, AlertCircle, FileText, Brain, Trash2, Edit2, Save, X } from 'lucide-react';
+
+const TABS = [
+    { id: 'create', label: 'Create Set', icon: BookOpen },
+    { id: 'upload', label: 'Upload Document', icon: FileText },
+    { id: 'query', label: 'Safe Query', icon: Search },
+    { id: 'plan', label: 'Generate Plan', icon: Brain },
+    { id: 'insights', label: 'Learning Twin', icon: Radar },
+    { id: 'exam', label: 'Exam Mode', icon: GraduationCap },
+];
 
 const RAGTestUI = () => {
     const {
@@ -13,17 +21,11 @@ const RAGTestUI = () => {
         deleteSet,
         queryDocuments,
         generateStudyPlan,
-        loading
+        loading,
     } = useRAG();
 
     const [activeTab, setActiveTab] = useState('create');
-    const [newSet, setNewSet] = useState({
-        name: '',
-        subject: '',
-        grade: '',
-        difficulty: 'medium',
-        description: ''
-    });
+    const [newSet, setNewSet] = useState({ name: '', subject: '', grade: '', difficulty: 'medium', description: '' });
     const [selectedSet, setSelectedSet] = useState(null);
     const [query, setQuery] = useState('');
     const [queryResults, setQueryResults] = useState(null);
@@ -32,92 +34,69 @@ const RAGTestUI = () => {
     const [editingSet, setEditingSet] = useState(null);
     const [editForm, setEditForm] = useState({});
 
-    const handleCreateSet = async (e) => {
-        e.preventDefault();
-        
-        // Validation
-        if (!newSet.name || !newSet.subject || !newSet.grade) {
-            setStatus({ type: 'error', message: 'Please fill in all required fields (Name, Subject, and Grade)' });
-            setTimeout(() => setStatus(null), 4000);
+    const [safeMode, setSafeMode] = useState(true);
+    const [learningTwin, setLearningTwin] = useState(null);
+    const [breakpoint, setBreakpoint] = useState(null);
+
+    const [examQuestionCount, setExamQuestionCount] = useState(8);
+    const [examSession, setExamSession] = useState(null);
+    const [examAnswers, setExamAnswers] = useState({});
+    const [examResult, setExamResult] = useState(null);
+
+    useEffect(() => {
+        if (!selectedSet) {
+            setLearningTwin(null);
+            setBreakpoint(null);
             return;
         }
-        
+
+        (async () => {
+            try {
+                const [lt, bp] = await Promise.all([
+                    advancedAPI.getLearningTwin(selectedSet),
+                    advancedAPI.getBreakpoint(selectedSet),
+                ]);
+                setLearningTwin(lt.data);
+                setBreakpoint(bp.data);
+            } catch (error) {
+                console.error('Failed to load advanced insights:', error);
+            }
+        })();
+    }, [selectedSet]);
+
+    const setStatusWithTimeout = (payload, ms = 3500) => {
+        setStatus(payload);
+        setTimeout(() => setStatus(null), ms);
+    };
+
+    const handleCreateSet = async (e) => {
+        e.preventDefault();
+        if (!newSet.name || !newSet.subject || !newSet.grade) {
+            setStatusWithTimeout({ type: 'error', message: 'Name, subject, and grade are required.' }, 4000);
+            return;
+        }
+
         try {
             setStatus({ type: 'loading', message: 'Creating set...' });
             const result = await createSet(newSet);
-            setStatus({ type: 'success', message: `Set "${result.name}" created successfully! You can now upload documents.` });
+            setStatusWithTimeout({ type: 'success', message: `Set "${result.name}" created.` });
             setNewSet({ name: '', subject: '', grade: '', difficulty: 'medium', description: '' });
-            setTimeout(() => setStatus(null), 4000);
+            setSelectedSet(result.id);
         } catch (error) {
-            setStatus({ type: 'error', message: `Failed to create set: ${error.message || 'Unknown error'}` });
-            setTimeout(() => setStatus(null), 5000);
+            setStatusWithTimeout({ type: 'error', message: error.message || 'Failed to create set' }, 5000);
         }
     };
 
-    const handleQuery = async (e) => {
-        e.preventDefault();
-        
-        if (!query || query.trim().length === 0) {
-            setStatus({ type: 'error', message: 'Please enter a question or query.' });
-            setTimeout(() => setStatus(null), 3000);
-            return;
-        }
-        
-        if (!selectedSet && (!sets || sets.length === 0)) {
-            setStatus({ type: 'error', message: 'Please create a set and upload documents first.' });
-            setTimeout(() => setStatus(null), 4000);
-            return;
-        }
-        
+    const handleDeleteSet = async (setId) => {
+        if (!confirm('Delete this set and all related data?')) return;
         try {
-            setStatus({ type: 'loading', message: 'Searching documents with AI...' });
-            setQueryResults(null); // Clear previous results
-            const results = await queryDocuments(query, selectedSet);
-            setQueryResults(results);
-
-            if (results && results.answer) {
-                setStatus({ type: 'success', message: 'AI answer generated successfully!' });
-            } else if (results && results.results && results.results.length > 0) {
-                setStatus({ type: 'success', message: `Found ${results.results.length} relevant document chunks.` });
-            } else {
-                setStatus({ type: 'error', message: 'No results found. Try uploading documents or adjusting your query.' });
-            }
-            setTimeout(() => setStatus(null), 4000);
+            setStatus({ type: 'loading', message: 'Deleting set...' });
+            await deleteSet(setId);
+            if (selectedSet === setId) setSelectedSet(null);
+            setStatusWithTimeout({ type: 'success', message: 'Set deleted.' });
         } catch (error) {
-            console.error("Frontend query error:", error);
-            setStatus({ type: 'error', message: `Search failed: ${error.response?.data?.error || error.message || 'Connection error. Is the backend running?'}` });
-            setQueryResults(null);
-            setTimeout(() => setStatus(null), 5000);
+            setStatusWithTimeout({ type: 'error', message: error.message || 'Delete failed' }, 5000);
         }
-    };
-
-    const handleGeneratePlan = async () => {
-        if (!selectedSet) {
-            setStatus({ type: 'error', message: 'Please select a set first to generate a study plan' });
-            setTimeout(() => setStatus(null), 3000);
-            return;
-        }
-        try {
-            setStatus({ type: 'loading', message: 'AI is generating your personalized study plan...' });
-            const plan = await generateStudyPlan(selectedSet, 7, 2);
-            setStudyPlan(plan);
-            setStatus({ type: 'success', message: 'Study plan generated successfully!' });
-            setTimeout(() => setStatus(null), 3000);
-        } catch (error) {
-            setStatus({ type: 'error', message: `Failed to generate plan: ${error.response?.data?.error || error.message || 'Unknown error'}` });
-            setStudyPlan(null);
-            setTimeout(() => setStatus(null), 5000);
-        }
-    };
-
-    const handleEditSet = (set) => {
-        setEditingSet(set.id);
-        setEditForm({
-            name: set.name,
-            subject: set.subject,
-            grade: set.grade,
-            difficulty: set.difficulty
-        });
     };
 
     const handleSaveEdit = async (setId) => {
@@ -125,80 +104,107 @@ const RAGTestUI = () => {
             setStatus({ type: 'loading', message: 'Updating set...' });
             await updateSet(setId, editForm);
             setEditingSet(null);
-            setEditForm({});
-            setStatus({ type: 'success', message: 'Set updated successfully!' });
-            setTimeout(() => setStatus(null), 3000);
+            setStatusWithTimeout({ type: 'success', message: 'Set updated.' });
         } catch (error) {
-            setStatus({ type: 'error', message: error.message });
+            setStatusWithTimeout({ type: 'error', message: error.message || 'Update failed' }, 5000);
         }
     };
 
-    const handleCancelEdit = () => {
-        setEditingSet(null);
-        setEditForm({});
-    };
-
-    const handleDeleteSet = async (setId) => {
-        if (!confirm('Are you sure you want to delete this set? This will also delete all associated documents and data.')) {
+    const handleQuery = async (e) => {
+        e.preventDefault();
+        if (!query.trim()) {
+            setStatusWithTimeout({ type: 'error', message: 'Enter a query first.' });
             return;
         }
+
         try {
-            setStatus({ type: 'loading', message: 'Deleting set...' });
-            await deleteSet(setId);
-            if (selectedSet === setId) {
-                setSelectedSet(null);
+            setStatus({ type: 'loading', message: safeMode ? 'Running safe query firewall...' : 'Querying documents...' });
+            setQueryResults(null);
+
+            const data = safeMode
+                ? (await advancedAPI.safeQuery(query, selectedSet)).data
+                : await queryDocuments(query, selectedSet);
+
+            setQueryResults(data);
+            if (data.blocked) {
+                setStatusWithTimeout({ type: 'error', message: 'Low trust answer blocked by firewall.' }, 4500);
+            } else {
+                setStatusWithTimeout({ type: 'success', message: 'Query completed.' });
             }
-            setStatus({ type: 'success', message: 'Set deleted successfully!' });
-            setTimeout(() => setStatus(null), 3000);
         } catch (error) {
-            setStatus({ type: 'error', message: error.message });
+            setStatusWithTimeout({ type: 'error', message: error.response?.data?.error || error.message || 'Query failed' }, 5000);
+        }
+    };
+
+    const handleGeneratePlan = async () => {
+        if (!selectedSet) {
+            setStatusWithTimeout({ type: 'error', message: 'Select a set first.' });
+            return;
+        }
+
+        try {
+            setStatus({ type: 'loading', message: 'Generating study plan...' });
+            const plan = await generateStudyPlan(selectedSet, 7, 2);
+            setStudyPlan(plan);
+            setStatusWithTimeout({ type: 'success', message: 'Study plan generated.' });
+        } catch (error) {
+            setStatusWithTimeout({ type: 'error', message: error.response?.data?.error || error.message || 'Plan generation failed' }, 5000);
+        }
+    };
+
+    const handleGenerateExam = async () => {
+        if (!selectedSet) {
+            setStatusWithTimeout({ type: 'error', message: 'Select a set first.' });
+            return;
+        }
+
+        try {
+            setStatus({ type: 'loading', message: 'Generating exam session...' });
+            const { data } = await advancedAPI.generateExam(selectedSet, examQuestionCount);
+            setExamSession(data);
+            setExamAnswers({});
+            setExamResult(null);
+            setStatusWithTimeout({ type: 'success', message: 'Exam generated.' });
+        } catch (error) {
+            setStatusWithTimeout({ type: 'error', message: error.response?.data?.error || error.message || 'Exam generation failed' }, 5000);
+        }
+    };
+
+    const handleSubmitExam = async () => {
+        if (!examSession?.session_id) return;
+        try {
+            setStatus({ type: 'loading', message: 'Submitting exam...' });
+            const { data } = await advancedAPI.submitExam(examSession.session_id, examAnswers);
+            setExamResult(data);
+            setStatusWithTimeout({ type: 'success', message: `Exam scored ${data.score}%` }, 5000);
+        } catch (error) {
+            setStatusWithTimeout({ type: 'error', message: error.response?.data?.error || error.message || 'Exam submit failed' }, 5000);
         }
     };
 
     return (
         <div className="h-full w-full p-8 overflow-y-auto bg-slate-950">
             <div className="w-full space-y-6">
-                {/* Header */}
-                <div className="mb-8">
-                    <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-                        Brainstorm
-                    </h1>
-                    <p className="text-slate-400">Upload documents, query knowledge, and generate study plans with AI</p>
+                <div>
+                    <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Brainstorm AI Lab</h1>
+                    <p className="text-slate-400">Advanced planning engine: Safe Query, Learning Twin, Breakpoint Detector, and Exam Mode Agent.</p>
                 </div>
 
-                {/* Status Message */}
                 {status && (
-                    <div className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${status.type === 'success' ? 'bg-green-500/10 border border-green-500/30' :
-                        status.type === 'error' ? 'bg-red-500/10 border border-red-500/30' :
-                            'bg-blue-500/10 border border-blue-500/30'
-                        }`}>
+                    <div className={`p-4 rounded-lg flex items-center gap-3 ${status.type === 'success' ? 'bg-green-500/10 border border-green-500/30' : status.type === 'error' ? 'bg-red-500/10 border border-red-500/30' : 'bg-blue-500/10 border border-blue-500/30'}`}>
                         {status.type === 'loading' && <Loader className="animate-spin text-blue-400" size={20} />}
                         {status.type === 'success' && <CheckCircle className="text-green-400" size={20} />}
                         {status.type === 'error' && <AlertCircle className="text-red-400" size={20} />}
-                        <p className={`text-sm ${status.type === 'success' ? 'text-green-300' :
-                            status.type === 'error' ? 'text-red-300' :
-                                'text-blue-300'
-                            }`}>
-                            {status.message}
-                        </p>
+                        <p className="text-sm text-slate-200">{status.message}</p>
                     </div>
                 )}
 
-                {/* Tabs */}
-                <div className="flex gap-2 mb-6 border-b border-slate-800">
-                    {[
-                        { id: 'create', label: 'Create Set', icon: BookOpen },
-                        { id: 'upload', label: 'Upload Document', icon: FileText },
-                        { id: 'query', label: 'Query Documents', icon: Search },
-                        { id: 'plan', label: 'Generate Plan', icon: Brain }
-                    ].map(tab => (
+                <div className="flex flex-wrap gap-2 border-b border-slate-800">
+                    {TABS.map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
-                            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${activeTab === tab.id
-                                ? 'border-blue-500 text-blue-400'
-                                : 'border-transparent text-slate-400 hover:text-slate-200'
-                                }`}
+                            className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${activeTab === tab.id ? 'border-blue-500 text-blue-400' : 'border-transparent text-slate-400 hover:text-slate-200'}`}
                         >
                             <tab.icon size={18} />
                             {tab.label}
@@ -206,404 +212,186 @@ const RAGTestUI = () => {
                     ))}
                 </div>
 
-                {/* Tab Content */}
-                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6" data-tour="brainstorm-create">
-                    {/* Create Set Tab */}
+                <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-6">
                     {activeTab === 'create' && (
-                        <div className="w-full">
-                            <h2 className="text-2xl font-bold mb-4">Create New Set</h2>
-                            <form onSubmit={handleCreateSet} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">Set Name</label>
-                                    <input
-                                        type="text"
-                                        value={newSet.name}
-                                        onChange={(e) => setNewSet({ ...newSet, name: e.target.value })}
-                                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="e.g., Calculus Integration"
-                                        required
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-300 mb-2">Subject</label>
-                                        <input
-                                            type="text"
-                                            value={newSet.subject}
-                                            onChange={(e) => setNewSet({ ...newSet, subject: e.target.value })}
-                                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="e.g., Mathematics"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-300 mb-2">Grade</label>
-                                        <input
-                                            type="text"
-                                            value={newSet.grade}
-                                            onChange={(e) => setNewSet({ ...newSet, grade: e.target.value })}
-                                            className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                            placeholder="e.g., 12"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">Difficulty</label>
-                                    <select
-                                        value={newSet.difficulty}
-                                        onChange={(e) => setNewSet({ ...newSet, difficulty: e.target.value })}
-                                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                    >
+                        <div className="space-y-6">
+                            <form onSubmit={handleCreateSet} className="space-y-3">
+                                <input value={newSet.name} onChange={(e) => setNewSet({ ...newSet, name: e.target.value })} className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" placeholder="Set Name" required />
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <input value={newSet.subject} onChange={(e) => setNewSet({ ...newSet, subject: e.target.value })} className="px-3 py-2 rounded bg-slate-800 border border-slate-700" placeholder="Subject" required />
+                                    <input value={newSet.grade} onChange={(e) => setNewSet({ ...newSet, grade: e.target.value })} className="px-3 py-2 rounded bg-slate-800 border border-slate-700" placeholder="Grade" required />
+                                    <select value={newSet.difficulty} onChange={(e) => setNewSet({ ...newSet, difficulty: e.target.value })} className="px-3 py-2 rounded bg-slate-800 border border-slate-700">
                                         <option value="easy">Easy</option>
                                         <option value="medium">Medium</option>
                                         <option value="hard">Hard</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                                        Description <span className="text-slate-500 text-xs">(Optional)</span>
-                                    </label>
-                                    <textarea
-                                        value={newSet.description}
-                                        onChange={(e) => setNewSet({ ...newSet, description: e.target.value })}
-                                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                        placeholder="Brief description of this study set..."
-                                        rows="3"
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-                                >
-                                    {loading ? 'Creating...' : 'Create Set'}
-                                </button>
+                                <textarea value={newSet.description} onChange={(e) => setNewSet({ ...newSet, description: e.target.value })} className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" rows={3} placeholder="Description" />
+                                <button disabled={loading} className="w-full py-2.5 rounded bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700">{loading ? 'Creating...' : 'Create Set'}</button>
                             </form>
 
-                            {/* Existing Sets */}
-                            {sets.length > 0 ? (
-                                <div className="mt-8">
-                                    <h3 className="text-lg font-semibold mb-4">Existing Sets ({sets.length})</h3>
-                                    <div className="space-y-2">
-                                        {sets.map(set => (
-                                            <div
-                                                key={set.id}
-                                                className={`p-4 rounded-lg border transition-all ${selectedSet === set.id
-                                                    ? 'bg-blue-500/20 border-blue-500'
-                                                    : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
-                                                    }`}
-                                            >
-                                                {editingSet === set.id ? (
-                                                    /* Edit Mode */
-                                                    <div className="space-y-3">
-                                                        <input
-                                                            type="text"
-                                                            value={editForm.name}
-                                                            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                                                            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm"
-                                                            placeholder="Set Name"
-                                                        />
-                                                        <div className="grid grid-cols-2 gap-2">
-                                                            <input
-                                                                type="text"
-                                                                value={editForm.subject}
-                                                                onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })}
-                                                                className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm"
-                                                                placeholder="Subject"
-                                                            />
-                                                            <input
-                                                                type="text"
-                                                                value={editForm.grade}
-                                                                onChange={(e) => setEditForm({ ...editForm, grade: e.target.value })}
-                                                                className="px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm"
-                                                                placeholder="Grade"
-                                                            />
-                                                        </div>
-                                                        <select
-                                                            value={editForm.difficulty}
-                                                            onChange={(e) => setEditForm({ ...editForm, difficulty: e.target.value })}
-                                                            className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded text-white text-sm"
-                                                        >
-                                                            <option value="easy">Easy</option>
-                                                            <option value="medium">Medium</option>
-                                                            <option value="hard">Hard</option>
-                                                        </select>
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => handleSaveEdit(set.id)}
-                                                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500 hover:bg-green-600 rounded text-sm font-medium transition-colors"
-                                                            >
-                                                                <Save size={16} />
-                                                                Save
-                                                            </button>
-                                                            <button
-                                                                onClick={handleCancelEdit}
-                                                                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-slate-600 hover:bg-slate-700 rounded text-sm font-medium transition-colors"
-                                                            >
-                                                                <X size={16} />
-                                                                Cancel
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    /* View Mode */
-                                                    <div>
-                                                        <div className="flex justify-between items-start mb-3">
-                                                            <div
-                                                                onClick={() => setSelectedSet(set.id)}
-                                                                className="flex-1 cursor-pointer"
-                                                            >
-                                                                <h4 className="font-semibold">{set.name}</h4>
-                                                                <p className="text-sm text-slate-400">{set.subject} • Grade {set.grade}</p>
-                                                            </div>
-                                                            <span className={`px-2 py-1 rounded text-xs ${set.difficulty === 'easy' ? 'bg-green-500/20 text-green-300' :
-                                                                set.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
-                                                                    'bg-red-500/20 text-red-300'
-                                                                }`}>
-                                                                {set.difficulty}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => handleEditSet(set)}
-                                                                className="flex items-center gap-1 px-3 py-1.5 bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 rounded text-xs font-medium transition-colors"
-                                                            >
-                                                                <Edit2 size={14} />
-                                                                Edit
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteSet(set.id)}
-                                                                className="flex items-center gap-1 px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 rounded text-xs font-medium transition-colors"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                                Delete
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="mt-8 p-6 bg-slate-800/30 border border-slate-700 rounded-lg text-center">
-                                    <BookOpen size={48} className="mx-auto text-slate-600 mb-3" />
-                                    <h3 className="text-lg font-semibold text-slate-300 mb-2">No Sets Yet</h3>
-                                    <p className="text-sm text-slate-400">
-                                        Create your first study set above to get started with uploading documents and asking questions.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Upload Document Tab */}
-                    {activeTab === 'upload' && (
-                        <div>
-                            <h2 className="text-2xl font-bold mb-4">Upload Document</h2>
-                            {selectedSet ? (
-                                <div>
-                                    <p className="text-slate-400 mb-4">
-                                        Uploading to: <span className="text-white font-semibold">
-                                            {sets.find(s => s.id === selectedSet)?.name}
-                                        </span>
-                                    </p>
-                                    <DocumentUpload
-                                        setId={selectedSet}
-                                        onUploadComplete={() => setStatus({ type: 'success', message: 'Document processed!' })}
-                                    />
-                                </div>
-                            ) : (
-                                <div className="text-center py-12 bg-slate-800/30 border border-slate-700 rounded-lg">
-                                    <FileText size={48} className="mx-auto text-slate-600 mb-4" />
-                                    <h3 className="text-lg font-semibold text-slate-300 mb-2">No Set Selected</h3>
-                                    <p className="text-slate-400 mb-4">
-                                        {sets.length === 0 
-                                            ? 'Create a set first in the "Create Set" tab' 
-                                            : 'Select a set from the "Create Set" tab to upload documents'}
-                                    </p>
-                                    {sets.length === 0 && (
-                                        <button
-                                            onClick={() => setActiveTab('create')}
-                                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors"
-                                        >
-                                            Go to Create Set
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Query Documents Tab */}
-                    {activeTab === 'query' && (
-                        <div>
-                            <h2 className="text-2xl font-bold mb-4">Query Documents</h2>
-                            <form onSubmit={handleQuery} className="space-y-4 mb-6">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-300 mb-2">Search Query</label>
-                                    <input
-                                        type="text"
-                                        value={query}
-                                        onChange={(e) => setQuery(e.target.value)}
-                                        className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="e.g., integration by parts"
-                                        required
-                                    />
-                                </div>
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors"
-                                >
-                                    {loading ? 'Searching...' : 'Search'}
-                                </button>
-                            </form>
-
-                            {/* Query Results */}
-                            {queryResults && (
-                                <div className="space-y-6">
-                                    {/* AI Answer */}
-                                    {queryResults.answer && (
-                                        <div className="p-6 bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-lg">
-                                            <div className="flex items-center gap-2 mb-4">
-                                                <Brain className="text-blue-400" size={24} />
-                                                <h3 className="text-xl font-semibold text-blue-300">AI Answer</h3>
-                                            </div>
-                                            <p className="text-slate-200 leading-relaxed whitespace-pre-wrap">{queryResults.answer}</p>
-
-                                            {/* Confidence & Search Type */}
-                                            <div className="flex gap-4 mt-4 pt-4 border-t border-slate-700">
-                                                <span className="text-xs text-slate-400">
-                                                    Confidence: <span className="text-blue-400">{(queryResults.confidence * 100).toFixed(0)}%</span>
-                                                </span>
-                                                <span className="text-xs text-slate-400">
-                                                    Search: <span className="text-purple-400">{queryResults.search_type || 'AI-powered'}</span>
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Sources */}
-                                    {queryResults.sources && queryResults.sources.length > 0 && (
-                                        <div>
-                                            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                                                <FileText size={20} className="text-slate-400" />
-                                                Sources ({queryResults.sources.length})
-                                            </h3>
-                                            <div className="space-y-3">
-                                                {queryResults.sources.map((source, idx) => (
-                                                    <div key={idx} className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <span className="text-sm text-blue-400">{source.citation || `Source ${idx + 1}`}</span>
-                                                            {source.relevance && (
-                                                                <span className="text-xs text-slate-500">
-                                                                    Relevance: {(source.relevance * 100).toFixed(0)}%
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-xs text-slate-500">
-                                                            Source: {source.source}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Fallback for keyword search results */}
-                                    {queryResults.results && queryResults.results.length > 0 && !queryResults.answer && (
-                                        <div>
-                                            <h3 className="text-lg font-semibold mb-4">Keyword Search Results ({queryResults.results.length})</h3>
-                                            <div className="space-y-3">
-                                                {queryResults.results.map((result, idx) => (
-                                                    <div key={idx} className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
-                                                        <p className="text-sm text-slate-300">{result.chunk}</p>
-                                                        <div className="text-xs text-slate-500 mt-2">
-                                                            Source: {result.document.filename}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* Generate Plan Tab */}
-                    {activeTab === 'plan' && (
-                        <div className="w-full">
-                            <h2 className="text-2xl font-bold mb-4">Generate Study Plan</h2>
-                            {selectedSet ? (
-                                <div>
-                                    <p className="text-slate-400 mb-4">
-                                        Generating plan for: <span className="text-white font-semibold">
-                                            {sets.find(s => s.id === selectedSet)?.name}
-                                        </span>
-                                    </p>
-                                    <button
-                                        onClick={handleGeneratePlan}
-                                        disabled={loading}
-                                        className="w-full py-3 bg-purple-500 hover:bg-purple-600 disabled:bg-slate-700 disabled:cursor-not-allowed rounded-lg font-medium transition-colors mb-6"
-                                    >
-                                        {loading ? 'Generating...' : 'Generate 7-Day Study Plan'}
-                                    </button>
-
-                                    {/* Study Plan Display */}
-                                    {studyPlan && (
-                                        <div className="space-y-4">
-                                            <div className="p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
-                                                <h3 className="font-semibold mb-2">{studyPlan.set_name}</h3>
-                                                <p className="text-sm text-slate-400">
-                                                    {studyPlan.duration_days} days • {studyPlan.hours_per_day} hours/day • {studyPlan.total_hours} total hours
-                                                </p>
-                                            </div>
-
-                                            {studyPlan.study_plan.map((day, idx) => (
-                                                <div key={idx} className="p-4 bg-slate-800/50 border border-slate-700 rounded-lg">
-                                                    <div className="flex justify-between items-center mb-3">
-                                                        <h4 className="font-semibold">Day {day.day} - {day.date}</h4>
-                                                        <span className={`px-2 py-1 rounded text-xs ${day.difficulty === 'easy' ? 'bg-green-500/20 text-green-300' :
-                                                            day.difficulty === 'medium' ? 'bg-yellow-500/20 text-yellow-300' :
-                                                                'bg-red-500/20 text-red-300'
-                                                            }`}>
-                                                            {day.difficulty}
-                                                        </span>
-                                                    </div>
-
-                                                    <div className="mb-3">
-                                                        <h5 className="text-sm font-medium text-slate-300 mb-2">Objectives:</h5>
-                                                        <ul className="text-sm text-slate-400 space-y-1">
-                                                            {day.objectives.map((obj, i) => (
-                                                                <li key={i}>• {obj}</li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-
-                                                    <div>
-                                                        <h5 className="text-sm font-medium text-slate-300 mb-2">Tasks:</h5>
-                                                        <div className="space-y-2">
-                                                            {day.tasks.map((task, i) => (
-                                                                <div key={i} className="flex justify-between items-center text-sm">
-                                                                    <span className="text-slate-400">{task.task}</span>
-                                                                    <span className="text-slate-500">{task.duration}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
+                            <div className="space-y-2">
+                                {sets.map((set) => (
+                                    <div key={set.id} className={`p-3 rounded border ${selectedSet === set.id ? 'border-blue-500 bg-blue-500/10' : 'border-slate-700 bg-slate-800/50'}`}>
+                                        {editingSet === set.id ? (
+                                            <div className="space-y-2">
+                                                <input value={editForm.name || ''} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full px-2 py-1 rounded bg-slate-700 border border-slate-600" />
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <input value={editForm.subject || ''} onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })} className="px-2 py-1 rounded bg-slate-700 border border-slate-600" />
+                                                    <input value={editForm.grade || ''} onChange={(e) => setEditForm({ ...editForm, grade: e.target.value })} className="px-2 py-1 rounded bg-slate-700 border border-slate-600" />
+                                                    <select value={editForm.difficulty || 'medium'} onChange={(e) => setEditForm({ ...editForm, difficulty: e.target.value })} className="px-2 py-1 rounded bg-slate-700 border border-slate-600">
+                                                        <option value="easy">Easy</option>
+                                                        <option value="medium">Medium</option>
+                                                        <option value="hard">Hard</option>
+                                                    </select>
                                                 </div>
-                                            ))}
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleSaveEdit(set.id)} className="flex-1 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 flex items-center justify-center gap-1"><Save size={14} /> Save</button>
+                                                    <button onClick={() => setEditingSet(null)} className="flex-1 py-1.5 rounded bg-slate-600 hover:bg-slate-500 flex items-center justify-center gap-1"><X size={14} /> Cancel</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div onClick={() => setSelectedSet(set.id)} className="cursor-pointer flex-1">
+                                                    <p className="font-semibold">{set.name}</p>
+                                                    <p className="text-sm text-slate-400">{set.subject} | Grade {set.grade} | {set.difficulty}</p>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => { setEditingSet(set.id); setEditForm({ name: set.name, subject: set.subject, grade: set.grade, difficulty: set.difficulty }); }} className="px-2 py-1 rounded bg-blue-500/20 text-blue-300 text-xs">Edit</button>
+                                                    <button onClick={() => handleDeleteSet(set.id)} className="px-2 py-1 rounded bg-red-500/20 text-red-300 text-xs flex items-center gap-1"><Trash2 size={12} /> Delete</button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'upload' && (
+                        selectedSet ? (
+                            <DocumentUpload setId={selectedSet} onUploadComplete={() => setStatusWithTimeout({ type: 'success', message: 'Document uploaded and processed.' })} />
+                        ) : <p className="text-slate-400">Select a set in Create tab first.</p>
+                    )}
+
+                    {activeTab === 'query' && (
+                        <div className="space-y-4">
+                            <form onSubmit={handleQuery} className="space-y-3">
+                                <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full px-3 py-2 rounded bg-slate-800 border border-slate-700" placeholder="Ask a question from your docs" required />
+                                <label className="flex items-center gap-2 text-sm text-slate-300">
+                                    <input type="checkbox" checked={safeMode} onChange={(e) => setSafeMode(e.target.checked)} className="rounded" />
+                                    <span className="flex items-center gap-1"><Shield size={14} /> Enable Hallucination Firewall</span>
+                                </label>
+                                <button className="w-full py-2.5 rounded bg-blue-500 hover:bg-blue-600">Run Query</button>
+                            </form>
+
+                            {queryResults && (
+                                <div className="space-y-3">
+                                    {queryResults.verdict && (
+                                        <div className="p-3 rounded border border-amber-500/30 bg-amber-500/10 text-sm text-amber-200">
+                                            Verdict: {queryResults.verdict} | Trust: {Math.round((queryResults.trust_score || 0) * 100)}%
+                                        </div>
+                                    )}
+                                    {queryResults.answer && (
+                                        <div className="p-4 rounded border border-slate-700 bg-slate-800/50">
+                                            <h3 className="font-semibold mb-2">Answer</h3>
+                                            <p className="text-slate-300 whitespace-pre-wrap">{queryResults.answer}</p>
                                         </div>
                                     )}
                                 </div>
-                            ) : (
-                                <div className="text-center py-12">
-                                    <Brain size={48} className="mx-auto text-slate-600 mb-4" />
-                                    <p className="text-slate-400">Please select a set first from the "Create Set" tab</p>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'plan' && (
+                        <div className="space-y-4">
+                            <button onClick={handleGeneratePlan} className="w-full py-2.5 rounded bg-purple-500 hover:bg-purple-600">Generate 7-Day Plan</button>
+                            {studyPlan && (
+                                <div className="space-y-3">
+                                    <div className="p-3 rounded border border-purple-500/30 bg-purple-500/10 text-sm">
+                                        {studyPlan.set_name} | {studyPlan.duration_days} days | {studyPlan.hours_per_day}h/day
+                                    </div>
+                                    {studyPlan.study_plan?.map((day) => (
+                                        <div key={day.day} className="p-3 rounded border border-slate-700 bg-slate-800/50">
+                                            <p className="font-semibold mb-1">Day {day.day} ({day.date})</p>
+                                            <ul className="text-sm text-slate-300 space-y-1">
+                                                {day.objectives?.map((o, i) => <li key={i}>- {o}</li>)}
+                                            </ul>
+                                        </div>
+                                    ))}
                                 </div>
                             )}
                         </div>
+                    )}
+
+                    {activeTab === 'insights' && (
+                        selectedSet ? (
+                            <div className="space-y-4">
+                                <div className="p-4 rounded border border-cyan-500/30 bg-cyan-500/10">
+                                    <h3 className="font-semibold text-cyan-300 mb-2">Learning Twin</h3>
+                                    {learningTwin ? (
+                                        <>
+                                            <p className="text-sm text-slate-200">Best Time Slot: {learningTwin.best_time_slot}</p>
+                                            <p className="text-sm text-slate-200">Preferred Modality: {learningTwin.preferred_modality}</p>
+                                            <p className="text-sm text-slate-200">Mastery Score: {learningTwin.mastery_score}</p>
+                                            <p className="text-sm text-slate-400 mt-2">{learningTwin.adaptation_notes}</p>
+                                        </>
+                                    ) : <p className="text-sm text-slate-400">Loading profile...</p>}
+                                </div>
+
+                                <div className="p-4 rounded border border-amber-500/30 bg-amber-500/10">
+                                    <h3 className="font-semibold text-amber-300 mb-2">Breakpoint Detector</h3>
+                                    {breakpoint ? (
+                                        <>
+                                            <p className="text-sm text-slate-200">Breakpoint Topic: {breakpoint.breakpoint_topic || 'N/A'}</p>
+                                            <p className="text-sm text-slate-200">Prerequisite Root: {breakpoint.prerequisite_root || 'N/A'}</p>
+                                            <p className="text-sm text-slate-200">Confidence: {Math.round((breakpoint.confidence || 0) * 100)}%</p>
+                                            <ul className="text-sm text-slate-400 mt-2 space-y-1">
+                                                {(breakpoint.remediation_path || []).map((x, i) => <li key={i}>- {x}</li>)}
+                                            </ul>
+                                        </>
+                                    ) : <p className="text-sm text-slate-400">Loading breakpoint analysis...</p>}
+                                </div>
+                            </div>
+                        ) : <p className="text-slate-400">Select a set first.</p>
+                    )}
+
+                    {activeTab === 'exam' && (
+                        selectedSet ? (
+                            <div className="space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <input type="number" min={3} max={20} value={examQuestionCount} onChange={(e) => setExamQuestionCount(Number(e.target.value))} className="w-24 px-2 py-1 rounded bg-slate-800 border border-slate-700" />
+                                    <button onClick={handleGenerateExam} className="px-4 py-2 rounded bg-indigo-500 hover:bg-indigo-600">Generate Exam</button>
+                                </div>
+
+                                {examSession?.questions?.map((q, idx) => (
+                                    <div key={q.id} className="p-4 rounded border border-slate-700 bg-slate-800/50">
+                                        <p className="font-medium mb-2">{idx + 1}. {q.question}</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                            {q.options.map((opt, i) => {
+                                                const label = ['A', 'B', 'C', 'D'][i];
+                                                return (
+                                                    <label key={label} className="flex items-center gap-2">
+                                                        <input type="radio" name={q.id} checked={examAnswers[q.id] === label} onChange={() => setExamAnswers((prev) => ({ ...prev, [q.id]: label }))} />
+                                                        <span>{label}. {opt}</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {examSession && <button onClick={handleSubmitExam} className="w-full py-2.5 rounded bg-emerald-500 hover:bg-emerald-600">Submit Exam</button>}
+
+                                {examResult && (
+                                    <div className="p-4 rounded border border-emerald-500/30 bg-emerald-500/10">
+                                        <h3 className="font-semibold text-emerald-300">Score: {examResult.score}%</h3>
+                                        <p className="text-sm text-slate-300">Correct: {examResult.correct}/{examResult.total}</p>
+                                        <p className="text-sm text-slate-400 mt-2">{examResult.recommendation}</p>
+                                    </div>
+                                )}
+                            </div>
+                        ) : <p className="text-slate-400">Select a set first.</p>
                     )}
                 </div>
             </div>

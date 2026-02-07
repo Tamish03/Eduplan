@@ -7,7 +7,7 @@ class PlanGenerator {
             const sql = `
         SELECT s.*, GROUP_CONCAT(d.filename) as documents
         FROM sets s
-        LEFT JOIN documents d ON s.id = d.id
+        LEFT JOIN documents d ON s.id = d.set_id
         WHERE s.id = ?
     GROUP BY s.id
       `;

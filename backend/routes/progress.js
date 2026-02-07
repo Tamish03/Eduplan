@@ -30,6 +30,18 @@ router.get('/gap-analysis/:setId', async (req, res) => {
     }
 });
 
+// Get exam score analytics (exam mode + quiz history)
+router.get('/exam-analysis', async (req, res) => {
+    try {
+        const { limit = 30 } = req.query;
+        const data = await progressAnalytics.getExamScoreAnalysis(Number(limit));
+        res.json(data);
+    } catch (error) {
+        console.error('Error fetching exam analysis:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Log a study session
 router.post('/session', async (req, res) => {
     try {

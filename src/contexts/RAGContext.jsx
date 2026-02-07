@@ -162,7 +162,6 @@ export const RAGProvider = ({ children }) => {
     // Load sets on mount
     useEffect(() => {
         loadSets();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const value = {

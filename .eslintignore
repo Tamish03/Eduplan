@@ -1,0 +1,5 @@
+node_modules/
+dist/
+EduPlan-Ai/
+backend/node_modules/
+backend/uploads/
