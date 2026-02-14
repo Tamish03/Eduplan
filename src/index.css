@@ -31,6 +31,75 @@
   }
 }
 
+/* Floating Animation for particles */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(20px);
+    opacity: 0;
+  }
+}
+
+/* Slow floating animation for cards */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Gradient animation */
+@keyframes gradient {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@layer utilities {
+  .animate-float {
+    animation: float linear infinite;
+  }
+  
+  .animate-float-slow {
+    animation: float-slow 3s ease-in-out infinite;
+  }
+  
+  .animate-gradient {
+    background-size: 200% 200%;
+    animation: gradient 3s ease infinite;
+  }
+  
+  .animate-fade-in {
+    animation: fade-in 1s ease-out;
+  }
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -38,8 +107,8 @@ body {
   width: 100%;
   height: 100%;
   background:
-    radial-gradient(circle at 15% 10%, rgba(255, 153, 51, 0.15), transparent 32%),
-    radial-gradient(circle at 85% 12%, rgba(19, 136, 8, 0.14), transparent 28%),
-    radial-gradient(circle at 50% 85%, rgba(0, 85, 164, 0.18), transparent 36%),
+    radial-gradient(circle at 15% 10%, rgba(255, 141, 161, 0.15), transparent 32%),
+    radial-gradient(circle at 85% 12%, rgba(255, 156, 233, 0.14), transparent 28%),
+    radial-gradient(circle at 50% 85%, rgba(173, 86, 196, 0.18), transparent 36%),
     #020617;
 }

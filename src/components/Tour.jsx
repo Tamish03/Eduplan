@@ -8,25 +8,25 @@ const Tour = ({ onComplete, onSkip }) => {
     const steps = [
         {
             target: 'nav-map',
-            title: '🗺️ Knowledge Map',
+            title: '🧠 Learning Path',
             description: 'Visualize your study sets as an interactive 3D graph. See connections between related topics and navigate your learning journey.',
             position: 'bottom'
         },
         {
             target: 'nav-content',
-            title: '🔍 Content Finder',
+            title: '🔍 Discover',
             description: 'Search the internet for curated educational resources. Get AI-powered recommendations from Khan Academy, Coursera, YouTube, and more!',
             position: 'bottom'
         },
         {
             target: 'nav-progress',
-            title: '📊 Progress Analytics',
+            title: '📊 Analytics',
             description: 'Track your learning progress with AI-powered gap analysis. Get personalized recommendations to improve your understanding.',
             position: 'bottom'
         },
         {
             target: 'nav-brainstorm',
-            title: '⚡ Brainstorm',
+            title: '⚡ AI Studio',
             description: 'Create study sets, upload documents, and ask questions. Our AI will analyze your materials and generate smart study plans.',
             position: 'bottom'
         },
@@ -68,9 +68,12 @@ const Tour = ({ onComplete, onSkip }) => {
 
     const handleSkip = () => {
         setIsVisible(false);
+        // Use setTimeout to ensure state update happens before parent unmounts component
         setTimeout(() => {
-            if (onSkip) onSkip();
-        }, 300);
+            if (onSkip) {
+                onSkip();
+            }
+        }, 0);
     };
 
     const completeTour = () => {
@@ -78,9 +81,12 @@ const Tour = ({ onComplete, onSkip }) => {
         // Return to map tab when tour completes
         const mapTab = document.querySelector('[data-tab="map"]');
         if (mapTab) mapTab.click();
+        // Use setTimeout to ensure state update happens before parent unmounts component
         setTimeout(() => {
-            if (onComplete) onComplete();
-        }, 300);
+            if (onComplete) {
+                onComplete();
+            }
+        }, 0);
     };
 
     const getTargetPosition = () => {
@@ -149,13 +155,13 @@ const Tour = ({ onComplete, onSkip }) => {
             {/* Spotlight */}
             {spotlight && (
                 <div
-                    className="fixed z-[9999] transition-all duration-300 rounded-lg"
+                    className="fixed z-[9999] transition-all duration-300 rounded-xl"
                     style={{
                         top: `${spotlight.top}px`,
                         left: `${spotlight.left}px`,
                         width: `${spotlight.width}px`,
                         height: `${spotlight.height}px`,
-                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7), 0 0 20px rgba(59, 130, 246, 0.5)',
+                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7), 0 0 30px rgba(255, 141, 161, 0.5), 0 0 60px rgba(173, 86, 196, 0.3)',
                         pointerEvents: 'none'
                     }}
                 />
@@ -176,25 +182,29 @@ const Tour = ({ onComplete, onSkip }) => {
                         opacity: isVisible ? 1 : 0
                     }}
                 >
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 border-2 border-blue-500/50 rounded-2xl shadow-2xl p-6 max-w-md backdrop-blur-xl">
-                        {/* Header */}
-                        <div className="flex items-start justify-between mb-4">
-                            <div>
-                                <h3 className="text-xl font-bold text-white mb-1">
-                                    {step.title}
-                                </h3>
-                                <div className="text-xs text-blue-300">
-                                    Step {currentStep + 1} of {steps.length}
+                    <div className="relative bg-slate-900/95 border-2 border-[#FF8DA1]/30 rounded-2xl shadow-2xl p-6 max-w-md backdrop-blur-xl overflow-hidden">
+                        {/* Animated glow */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-[#FF8DA1]/10 via-[#FF9CE9]/10 to-[#AD56C4]/10 animate-gradient" />
+                        
+                        <div className="relative z-10">
+                            {/* Header */}
+                            <div className="flex items-start justify-between mb-4">
+                                <div>
+                                    <h3 className="text-xl font-bold bg-gradient-to-r from-[#FF8DA1] to-[#AD56C4] bg-clip-text text-transparent mb-1">
+                                        {step.title}
+                                    </h3>
+                                    <div className="text-xs text-[#FF9CE9]">
+                                        Step {currentStep + 1} of {steps.length}
+                                    </div>
                                 </div>
+                                <button
+                                    onClick={handleSkip}
+                                    className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-white/5 rounded-xl"
+                                    title="Skip tour"
+                                >
+                                    <X size={18} />
+                                </button>
                             </div>
-                            <button
-                                onClick={handleSkip}
-                                className="text-slate-400 hover:text-white transition-colors p-1"
-                                title="Skip tour"
-                            >
-                                <X size={20} />
-                            </button>
-                        </div>
 
                         {/* Content */}
                         <p className="text-slate-300 mb-6 leading-relaxed">
@@ -208,9 +218,9 @@ const Tour = ({ onComplete, onSkip }) => {
                                     key={index}
                                     className={`h-2 rounded-full transition-all duration-300 ${
                                         index === currentStep
-                                            ? 'w-8 bg-blue-500'
+                                            ? 'w-8 bg-gradient-to-r from-[#FF8DA1] to-[#AD56C4]'
                                             : index < currentStep
-                                                ? 'w-2 bg-green-500'
+                                                ? 'w-2 bg-[#AD56C4]'
                                                 : 'w-2 bg-slate-600'
                                     }`}
                                 />
@@ -222,7 +232,7 @@ const Tour = ({ onComplete, onSkip }) => {
                             {currentStep > 0 && (
                                 <button
                                     onClick={handlePrevious}
-                                    className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-all"
+                                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-slate-300 hover:text-white rounded-xl transition-all"
                                 >
                                     <ArrowLeft size={16} />
                                     Previous
@@ -231,42 +241,47 @@ const Tour = ({ onComplete, onSkip }) => {
                             
                             <button
                                 onClick={handleSkip}
-                                className="px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                                className="px-4 py-2 text-slate-400 hover:text-slate-300 transition-colors"
                             >
                                 Skip Tour
                             </button>
 
                             <button
                                 onClick={handleNext}
-                                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg transition-all ml-auto font-semibold"
+                                className="relative flex items-center gap-2 px-6 py-2 rounded-xl ml-auto font-semibold overflow-hidden group"
                             >
-                                {currentStep === steps.length - 1 ? (
-                                    <>
-                                        <Check size={16} />
-                                        Finish
-                                    </>
-                                ) : (
-                                    <>
-                                        Next
-                                        <ArrowRight size={16} />
-                                    </>
-                                )}
+                                <div className="absolute inset-0 bg-gradient-to-r from-[#FF8DA1] to-[#AD56C4]" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-[#FF8DA1] to-[#AD56C4] blur-xl opacity-0 group-hover:opacity-50 transition-opacity" />
+                                <div className="relative text-white flex items-center gap-2">
+                                    {currentStep === steps.length - 1 ? (
+                                        <>
+                                            <Check size={16} />
+                                            Finish
+                                        </>
+                                    ) : (
+                                        <>
+                                            Next
+                                            <ArrowRight size={16} />
+                                        </>
+                                    )}
+                                </div>
                             </button>
+                        </div>
                         </div>
                     </div>
 
                     {/* Arrow pointing to target */}
                     {step.position === 'bottom' && (
-                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-b-[12px] border-b-blue-500/50" />
+                        <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-b-[12px] border-b-[#FF8DA1]/30" />
                     )}
                     {step.position === 'top' && (
-                        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[12px] border-t-blue-500/50" />
+                        <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-[12px] border-l-transparent border-r-[12px] border-r-transparent border-t-[12px] border-t-[#FF8DA1]/30" />
                     )}
                     {step.position === 'left' && (
-                        <div className="absolute top-1/2 -right-3 transform -translate-y-1/2 w-0 h-0 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent border-l-[12px] border-l-blue-500/50" />
+                        <div className="absolute top-1/2 -right-3 transform -translate-y-1/2 w-0 h-0 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent border-l-[12px] border-l-[#FF8DA1]/30" />
                     )}
                     {step.position === 'right' && (
-                        <div className="absolute top-1/2 -left-3 transform -translate-y-1/2 w-0 h-0 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent border-r-[12px] border-r-blue-500/50" />
+                        <div className="absolute top-1/2 -left-3 transform -translate-y-1/2 w-0 h-0 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent border-r-[12px] border-r-[#FF8DA1]/30" />
                     )}
                 </div>
             )}

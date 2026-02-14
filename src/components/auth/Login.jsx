@@ -10,7 +10,7 @@ const Login = ({ onLogin, onNavigate }) => {
     const [message, setMessage] = useState({ text: '', type: '' });
 
     const messageClass = useMemo(
-        () => (message.type === 'error' ? 'text-red-300 bg-red-500/10 border-red-500/30' : 'text-emerald-300 bg-emerald-500/10 border-emerald-500/30'),
+        () => (message.type === 'error' ? 'text-red-300 bg-red-500/10 border-red-500/30' : 'text-[#AD56C4] bg-[#AD56C4]/10 border-[#AD56C4]/30'),
         [message.type]
     );
 
@@ -36,18 +36,18 @@ const Login = ({ onLogin, onNavigate }) => {
     return (
         <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center p-4 md:p-6">
             <div className="w-full max-w-6xl grid lg:grid-cols-2 rounded-3xl overflow-hidden border border-slate-800 shadow-2xl bg-slate-900/70 backdrop-blur-xl">
-                <section className="relative p-8 md:p-12 bg-gradient-to-br from-slate-900 via-slate-900 to-sky-950 border-b lg:border-b-0 lg:border-r border-slate-800">
+                <section className="relative p-8 md:p-12 bg-gradient-to-br from-slate-900 via-slate-900 to-black border-b lg:border-b-0 lg:border-r border-slate-800">
                     <div className="absolute inset-0 pointer-events-none">
-                        <div className="absolute -top-16 -left-16 w-52 h-52 rounded-full bg-orange-400/20 blur-3xl" />
-                        <div className="absolute -bottom-20 right-0 w-64 h-64 rounded-full bg-emerald-400/20 blur-3xl" />
+                        <div className="absolute -top-16 -left-16 w-52 h-52 rounded-full bg-[#FF8DA1]/20 blur-3xl" />
+                        <div className="absolute -bottom-20 right-0 w-64 h-64 rounded-full bg-[#AD56C4]/20 blur-3xl" />
                     </div>
 
                     <div className="relative">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/30 text-sky-300 text-xs uppercase tracking-wide mb-5">
-                            <Sparkles size={14} /> AI For Bharat
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FF8DA1]/10 border border-[#FF8DA1]/30 text-[#FF8DA1] text-xs uppercase tracking-wide mb-5">
+                            <Sparkles size={14} /> AI-Powered Learning
                         </div>
-                        <h1 className="text-3xl md:text-4xl font-bold leading-tight">
-                            EduPlan Bharat AI
+                        <h1 className="text-3xl md:text-4xl font-bold leading-tight bg-gradient-to-r from-[#FF8DA1] via-[#FF9CE9] to-[#AD56C4] bg-clip-text text-transparent">
+                            EduPlan.ai
                         </h1>
                         <p className="mt-3 text-slate-300 max-w-md">
                             Turn scattered study resources into a connected learning engine with RAG, planning, and progress intelligence.
@@ -59,9 +59,14 @@ const Login = ({ onLogin, onNavigate }) => {
                             <FeatureRow icon={<Lock size={16} />} text="Hackathon-ready architecture and route stability" />
                         </div>
 
-                        <div className="mt-8 rounded-xl border border-slate-700 bg-slate-900/70 p-4 text-sm">
-                            <div className="text-slate-400 mb-1">Demo Access</div>
-                            <div className="text-slate-200 font-mono">demo@eduplan.ai / Demo@123</div>
+                        <div className="mt-8">
+                            <button
+                                onClick={() => onLogin({ email: 'guest@eduplan.ai', name: 'Guest User' })}
+                                className="w-full py-3 rounded-xl bg-gradient-to-r from-[#FF8DA1] to-[#AD56C4] hover:from-[#FF8DA1]/90 hover:to-[#AD56C4]/90 font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#FF8DA1]/20"
+                            >
+                                Continue as Guest User
+                                <ArrowRight size={16} />
+                            </button>
                         </div>
                     </div>
                 </section>
@@ -79,7 +84,7 @@ const Login = ({ onLogin, onNavigate }) => {
                                 placeholder="you@example.com"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-sky-500 focus:outline-none"
+                                className="w-full pl-10 pr-3 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-[#FF9CE9] focus:outline-none"
                                 required
                             />
                         </div>
@@ -92,7 +97,7 @@ const Login = ({ onLogin, onNavigate }) => {
                                 placeholder="Enter password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full pl-10 pr-16 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-sky-500 focus:outline-none"
+                                className="w-full pl-10 pr-16 py-2.5 rounded-xl bg-slate-800 border border-slate-700 focus:border-[#FF9CE9] focus:outline-none"
                                 required
                             />
                             <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-2.5 text-xs text-slate-400 hover:text-slate-200">
@@ -101,7 +106,7 @@ const Login = ({ onLogin, onNavigate }) => {
                         </div>
 
                         <div className="flex justify-end">
-                            <button type="button" onClick={() => onNavigate('forgot-password')} className="text-sm text-sky-300 hover:text-sky-200">
+                            <button type="button" onClick={() => onNavigate('forgot-password')} className="text-sm text-[#FF9CE9] hover:text-[#FF8DA1]">
                                 Forgot Password?
                             </button>
                         </div>
@@ -111,7 +116,7 @@ const Login = ({ onLogin, onNavigate }) => {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-sky-500 to-cyan-500 hover:from-sky-400 hover:to-cyan-400 disabled:opacity-60 font-semibold flex items-center justify-center gap-2"
+                            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#FF8DA1] to-[#AD56C4] hover:from-[#FF8DA1]/90 hover:to-[#AD56C4]/90 disabled:opacity-60 font-semibold flex items-center justify-center gap-2 shadow-lg shadow-[#FF8DA1]/20"
                         >
                             {loading ? 'Signing in...' : 'Log In'}
                             {!loading && <ArrowRight size={16} />}
@@ -119,7 +124,7 @@ const Login = ({ onLogin, onNavigate }) => {
 
                         <p className="text-sm text-slate-400 text-center">
                             No account?{' '}
-                            <button type="button" onClick={() => onNavigate('signup')} className="text-sky-300 hover:text-sky-200 font-medium">
+                            <button type="button" onClick={() => onNavigate('signup')} className="text-[#FF9CE9] hover:text-[#FF8DA1] font-medium">
                                 Create one now
                             </button>
                         </p>
@@ -133,7 +138,7 @@ const Login = ({ onLogin, onNavigate }) => {
 function FeatureRow({ icon, text }) {
     return (
         <div className="flex items-center gap-2.5 text-sm text-slate-200">
-            <div className="p-1.5 rounded-md bg-slate-800 border border-slate-700 text-sky-300">{icon}</div>
+            <div className="p-1.5 rounded-md bg-slate-800 border border-slate-700 text-[#FF9CE9]">{icon}</div>
             <span>{text}</span>
         </div>
     );
