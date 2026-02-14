@@ -476,7 +476,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **React Force Graph**: For 3D knowledge visualization
 - **Tailwind CSS**: For rapid UI development
 - **Lucide Icons**: For beautiful iconography
-- **The Open Source Community**: For inspiration and tools
+- **The Open Source Community**: For inspiration and tools.
 
 ---
 
